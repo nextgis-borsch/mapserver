@@ -5,4 +5,4 @@ removed/disabled some bindings.
 
 # Version
 
-7.0.7-5 
+7.0.7-6 
