@@ -1012,7 +1012,9 @@ if(BUILD_DYNAMIC)
 
    # Export the package for use from the build-tree
    # (this registers the build-tree with a global CMake-registry)
-   export(PACKAGE mapserver)
+    if(REGISTER_PACKAGE)
+       export(PACKAGE mapserver)
+    endif()
 
    list(APPEND ALL_INCLUDE_DIRS ${INSTALL_INCLUDE_DIR})
    list(APPEND ALL_INCLUDE_DIRS ${INSTALL_INCLUDE_DIR}/mapserver)
