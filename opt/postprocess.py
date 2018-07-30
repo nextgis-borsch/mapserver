@@ -26,7 +26,7 @@ utilfile = os.path.join(os.getcwd(), os.pardir, 'CMakeLists.txt')
 # Get values
 ms_major = "set (MapServer_VERSION_MAJOR 0)"
 ms_minor = "set (MapServer_VERSION_MINOR 0)"
-ms_patch = "set (MapServer_VERSION_REVISION 7)"
+ms_patch = "set (MapServer_VERSION_REVISION 0)"
 
 ms_major_get = False
 ms_minor_get = False
