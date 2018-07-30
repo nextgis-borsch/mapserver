@@ -1,4 +1,4 @@
-.,.,,"README,h,c,cpp,hpp,WIN32,in,HISTORY.TXT,MIGRATION_GUIDE.txt"
+.,.,,"README,h,c,cpp,hpp,WIN32,in,HISTORY.TXT,MIGRATION_GUIDE.txt,y,l,dtd"
 apache,apache,,c
 cmake,cmake,skip,
 fonts,fonts,,example
@@ -11,7 +11,6 @@ mapscript/perl/examples,mapscript/perl/examples,,pl
 mapscript/php,mapscript/php,skip,
 mapscript/python,mapscript/python,,"i,cfg,py,txt"
 mapscript/python/examples,mapscript/python/examples,,py
-mapscript/python/pygdioctx,mapscript/python/pygdioctx,,"c,h"
 mapscript/python/tests,mapscript/python/tests,skip,
 mapscript/ruby,mapscript/ruby,skip,
 mapscript/swiginc,mapscript/swiginc,,i
@@ -22,6 +21,7 @@ renderers/agg,renderers/agg,,"LICENSE,copying,authors"
 renderers/agg/include,renderers/agg/include,,"h,hpp"
 renderers/agg/include/util,renderers/agg/include/util,,h
 renderers/agg/src,renderers/agg/src,,cpp
+renderers/mvt,renderers/mvt,,proto
 scripts,scripts,skip,
 symbols,symbols,,"map,sym"
 tests,tests,skip,
