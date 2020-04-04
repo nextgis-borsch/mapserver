@@ -4025,6 +4025,8 @@ int msPostGISLayerTranslateFilter(layerObj *layer, expressionObj *filter, char *
     msFree(snippet);
     msFree(stresc);
   } else if(filter->type == MS_EXPRESSION) {
+    int ieq_expected = MS_FALSE;
+
     if(msPostGISParseData(layer) != MS_SUCCESS) return MS_FAILURE;
 
     if(layer->debug >= 2) msDebug("msPostGISLayerTranslateFilter. String: %s.\n", filter->string);
@@ -4032,16 +4034,19 @@ int msPostGISLayerTranslateFilter(layerObj *layer, expressionObj *filter, char *
     if(layer->debug >= 2) msDebug("msPostGISLayerTranslateFilter. There are tokens to process... \n");
 
     node = filter->tokens;
-    while (node != NULL) {      
+    while (node != NULL) {
 
       /*
       ** Do any token caching/tracking here, easier to have it in one place.
       */
       if(node->token == MS_TOKEN_BINDING_TIME) {
         bindingToken = node->token;
-      } else if(node->token == MS_TOKEN_COMPARISON_EQ || node->token == MS_TOKEN_COMPARISON_NE ||
-         node->token == MS_TOKEN_COMPARISON_GT || node->token == MS_TOKEN_COMPARISON_GE || 
-         node->token == MS_TOKEN_COMPARISON_LT || node->token == MS_TOKEN_COMPARISON_LE) {
+      } else if(node->token == MS_TOKEN_COMPARISON_EQ ||
+         node->token == MS_TOKEN_COMPARISON_IEQ ||
+         node->token == MS_TOKEN_COMPARISON_NE ||
+         node->token == MS_TOKEN_COMPARISON_GT || node->token == MS_TOKEN_COMPARISON_GE ||
+         node->token == MS_TOKEN_COMPARISON_LT || node->token == MS_TOKEN_COMPARISON_LE ||
+         node->token == MS_TOKEN_COMPARISON_IN) {
         comparisonToken = node->token;
       }
 
@@ -4066,13 +4071,41 @@ int msPostGISLayerTranslateFilter(layerObj *layer, expressionObj *filter, char *
           msFree(snippet);
           break;
         case MS_TOKEN_LITERAL_STRING:
-          strtmpl = "'%s'";
-          stresc = msPostGISEscapeSQLParam(layer, node->tokenval.strval);
-          snippet = (char *) msSmallMalloc(strlen(strtmpl) + strlen(stresc));
-          sprintf(snippet, strtmpl, stresc);
-          native_string = msStringConcatenate(native_string, snippet);
-          msFree(snippet);
-          msFree(stresc);
+
+          if(comparisonToken == MS_TOKEN_COMPARISON_IN) { /* issue 5490 */
+            char **strings=NULL;
+            int i, nstrings=0;
+
+	    strings = msStringSplit(node->tokenval.strval, ',', &nstrings);
+            if(nstrings > 0) {
+	      native_string = msStringConcatenate(native_string, "(");
+              for(i=0; i<nstrings; i++) {
+                if(i != 0) native_string = msStringConcatenate(native_string, ",");
+                strtmpl = "'%s'";
+		stresc = msPostGISEscapeSQLParam(layer, strings[i]);
+		snippet = (char *) msSmallMalloc(strlen(strtmpl) + strlen(stresc));
+		sprintf(snippet, strtmpl, stresc);
+		native_string = msStringConcatenate(native_string, snippet);
+		msFree(snippet);
+		msFree(stresc);
+              }
+              native_string = msStringConcatenate(native_string, ")");
+            }
+
+            msFreeCharArray(strings, nstrings);
+          } else {
+            if(comparisonToken == MS_TOKEN_COMPARISON_IEQ)
+                strtmpl = "lower('%s')";
+            else
+                strtmpl = "'%s'";
+            stresc = msPostGISEscapeSQLParam(layer, node->tokenval.strval);
+            snippet = (char *) msSmallMalloc(strlen(strtmpl) + strlen(stresc));
+            sprintf(snippet, strtmpl, stresc);
+            native_string = msStringConcatenate(native_string, snippet);
+            msFree(snippet);
+            msFree(stresc);
+          }
+
           break;
         case MS_TOKEN_LITERAL_TIME: {
 	  snippet = (char *) msSmallMalloc(512);
@@ -4112,7 +4145,11 @@ int msPostGISLayerTranslateFilter(layerObj *layer, expressionObj *filter, char *
         case MS_TOKEN_BINDING_DOUBLE:
         case MS_TOKEN_BINDING_INTEGER:
         case MS_TOKEN_BINDING_STRING:
-          if(node->token == MS_TOKEN_BINDING_STRING || node->next->token == MS_TOKEN_COMPARISON_RE || node->next->token == MS_TOKEN_COMPARISON_IRE)
+          if (node->token == MS_TOKEN_BINDING_STRING && node->next->token == MS_TOKEN_COMPARISON_IEQ ) {
+            strtmpl = "lower(%s::text)";
+            ieq_expected = MS_TRUE;
+          }
+          else if(node->token == MS_TOKEN_BINDING_STRING || node->next->token == MS_TOKEN_COMPARISON_RE || node->next->token == MS_TOKEN_COMPARISON_IRE)
             strtmpl = "%s::text"; /* explicit cast necessary for certain operators */
           else
             strtmpl = "%s";
@@ -4158,8 +4195,19 @@ int msPostGISLayerTranslateFilter(layerObj *layer, expressionObj *filter, char *
           native_string = msStringConcatenate(native_string, msExpressionTokenToString(node->token));
           break;
 
-	/* unsupported tokens */ 
 	case MS_TOKEN_COMPARISON_IEQ:
+            if( ieq_expected )
+            {
+                native_string = msStringConcatenate(native_string, "=");
+                ieq_expected = MS_FALSE;
+            }
+            else
+            {
+                goto cleanup;
+            }
+            break;
+
+	/* unsupported tokens */
         case MS_TOKEN_COMPARISON_BEYOND:
 	case MS_TOKEN_FUNCTION_TOSTRING:
 	case MS_TOKEN_FUNCTION_ROUND:

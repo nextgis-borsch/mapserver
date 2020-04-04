@@ -758,6 +758,7 @@ string_exp: STRING
   | TOSTRING '(' math_exp ',' string_exp ')' {
     $$ = (char *) malloc(strlen($5) + 64); /* Plenty big? Should use snprintf below... */
     sprintf($$, $5, $3);
+    free($5);
   }
   | COMMIFY '(' string_exp ')' {  
     $3 = msCommifyString($3); 
@@ -833,6 +834,8 @@ int yylex(YYSTYPE *lvalp, parseObj *p)
   case MS_TOKEN_COMPARISON_GE: token = GE; break;
   case MS_TOKEN_COMPARISON_RE: token = RE; break;
   case MS_TOKEN_COMPARISON_IRE: token = IRE; break;
+
+  case MS_TOKEN_COMPARISON_IN: token = IN; break;
 
   case MS_TOKEN_COMPARISON_INTERSECTS: token = INTERSECTS; break;
   case MS_TOKEN_COMPARISON_DISJOINT: token = DISJOINT; break;

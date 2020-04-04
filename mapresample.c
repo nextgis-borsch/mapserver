@@ -217,7 +217,6 @@ msNearestRasterResampler( imageObj *psSrcImage, rasterBufferObj *src_rb,
   free( panSuccess );
   free( x );
   free( y );
-  msFree(mask_rb);
 
   /* -------------------------------------------------------------------- */
   /*      Some debugging output.                                          */
@@ -450,7 +449,6 @@ msBilinearRasterResampler( imageObj *psSrcImage, rasterBufferObj *src_rb,
   free( panSuccess );
   free( x );
   free( y );
-  msFree(mask_rb);
 
   /* -------------------------------------------------------------------- */
   /*      Some debugging output.                                          */
@@ -648,7 +646,6 @@ msAverageRasterResampler( imageObj *psSrcImage, rasterBufferObj *src_rb,
   free( panSuccess2 );
   free( x2 );
   free( y2 );
-  msFree(mask_rb);
 
   /* -------------------------------------------------------------------- */
   /*      Some debugging output.                                          */
@@ -1148,6 +1145,7 @@ static int msTransformMapToSource( int nDstXSize, int nDstYSize,
           double dfYMinOut = 0.0;
           double dfXMaxOut = 0.0;
           double dfYMaxOut = 0.0;
+          const double dfHalfRes = adfDstGeoTransform[1] / 2;
 
           /* Find out average y coordinate in src projection */
           for( i = 0; i < nSamples; i++ ) {
@@ -1186,7 +1184,7 @@ static int msTransformMapToSource( int nDstXSize, int nDstYSize,
                         2, 1, x2, y2, z2 );
           msReleaseLock( TLOCK_PROJ );
 
-          if( x2[0] >= dfXMinOut && x2[0] <= dfXMaxOut &&
+          if( x2[0] >= dfXMinOut - dfHalfRes && x2[0] <= dfXMaxOut + dfHalfRes &&
               y2[0] >= dfYMinOut && y2[0] <= dfYMaxOut )
           {
                 double x_out =      adfInvSrcGeoTransform[0]
@@ -1196,8 +1194,8 @@ static int msTransformMapToSource( int nDstXSize, int nDstYSize,
                             +   (dfLonWrap-180)*adfInvSrcGeoTransform[4]
                             +   dfY*adfInvSrcGeoTransform[5];
 
-                /* Does the raster cover a whole 360 deg range ? */
-                if( nSrcXSize == (int)(adfInvSrcGeoTransform[1] * 360 + 0.5) )
+                /* Does the raster cover, at least, a whole 360 deg range ? */
+                if( nSrcXSize >= (int)(adfInvSrcGeoTransform[1] * 360) )
                 {
                     psSrcExtent->minx = 0;
                     psSrcExtent->maxx = nSrcXSize;
@@ -1211,8 +1209,8 @@ static int msTransformMapToSource( int nDstXSize, int nDstYSize,
                 psSrcExtent->maxy = MS_MAX(psSrcExtent->maxy, y_out);
           }
 
-          if( x2[1] >= dfXMinOut && x2[1] <= dfXMaxOut &&
-              x2[1] >= dfYMinOut && y2[1] <= dfYMaxOut )
+          if( x2[1] >= dfXMinOut - dfHalfRes && x2[1] <= dfXMaxOut + dfHalfRes &&
+              y2[1] >= dfYMinOut && y2[1] <= dfYMaxOut )
           {
                 double x_out =      adfInvSrcGeoTransform[0]
                             +   (dfLonWrap+180)*adfInvSrcGeoTransform[1]
@@ -1221,8 +1219,8 @@ static int msTransformMapToSource( int nDstXSize, int nDstYSize,
                             +   (dfLonWrap+180)*adfInvSrcGeoTransform[4]
                             +   dfY*adfInvSrcGeoTransform[5];
 
-                /* Does the raster cover a whole 360 deg range ? */
-                if( nSrcXSize == (int)(adfInvSrcGeoTransform[1] * 360 + 0.5) )
+                /* Does the raster cover, at least, a whole 360 deg range ? */
+                if( nSrcXSize >= (int)(adfInvSrcGeoTransform[1] * 360) )
                 {
                     psSrcExtent->minx = 0;
                     psSrcExtent->maxx = nSrcXSize;
@@ -1453,6 +1451,7 @@ int msResampleGDALToMap( mapObj *map, layerObj *layer, imageObj *image,
             if( layer->debug )
                 msDebug( "msResampleGDALToMap(): Request matching raster resolution and pixel boundaries. "
                          "No need to do resampling/reprojection.\n" );
+            msFree(mask_rb);
             return msDrawRasterLayerGDAL( map, layer, image, rb, hDS );
       }
 
@@ -1495,6 +1494,7 @@ int msResampleGDALToMap( mapObj *map, layerObj *layer, imageObj *image,
       || sSrcExtent.maxy <= sSrcExtent.miny ) {
     if( layer->debug )
       msDebug( "msResampleGDALToMap(): no overlap ... no result.\n" );
+    msFree(mask_rb);
     return 0;
   }
 
@@ -1635,18 +1635,22 @@ int msResampleGDALToMap( mapObj *map, layerObj *layer, imageObj *image,
                             sDummyMap.outputformat, NULL, NULL,
                             map->resolution, map->defresolution, &(sDummyMap.imagecolor));
 
-  if (srcImage == NULL)
+  if (srcImage == NULL) {
+    msFree(mask_rb);
     return -1; /* msSetError() should have been called already */
+  }
 
   if( MS_RENDERER_PLUGIN( srcImage->format ) ) {
     psrc_rb = &src_rb;
     memset( psrc_rb, 0, sizeof(rasterBufferObj) );
     if( srcImage->format->vtable->supports_pixel_buffer ) {
       if(UNLIKELY(MS_FAILURE == srcImage->format->vtable->getRasterBufferHandle( srcImage, psrc_rb ))) {
+        msFree(mask_rb);
         return -1;
       }
     } else {
       if(UNLIKELY(MS_FAILURE == srcImage->format->vtable->initializeRasterBuffer(psrc_rb,nLoadImgXSize, nLoadImgYSize,MS_IMAGEMODE_RGBA))) {
+        msFree(mask_rb);
         return -1;
       }
     }
@@ -1674,6 +1678,7 @@ int msResampleGDALToMap( mapObj *map, layerObj *layer, imageObj *image,
         msFreeRasterBuffer(psrc_rb);
 
       msFreeImage( srcImage );
+      msFree(mask_rb);
 
       return result;
     }
@@ -1694,6 +1699,7 @@ int msResampleGDALToMap( mapObj *map, layerObj *layer, imageObj *image,
     if( MS_RENDERER_PLUGIN( srcImage->format ) && !srcImage->format->vtable->supports_pixel_buffer)
       msFreeRasterBuffer(psrc_rb);
     msFreeImage( srcImage );
+    msFree(mask_rb);
     return MS_PROJERR;
   }
 
@@ -1732,6 +1738,7 @@ int msResampleGDALToMap( mapObj *map, layerObj *layer, imageObj *image,
   /* -------------------------------------------------------------------- */
   /*      cleanup                                                         */
   /* -------------------------------------------------------------------- */
+  msFree(mask_rb);
   if( MS_RENDERER_PLUGIN( srcImage->format ) && !srcImage->format->vtable->supports_pixel_buffer)
     msFreeRasterBuffer(psrc_rb);
   msFreeImage( srcImage );

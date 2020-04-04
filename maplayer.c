@@ -1680,7 +1680,7 @@ int msLayerApplyPlainFilterToLayer(FilterEncodingNode *psNode, mapObj *map, int 
 int msLayerSupportsSorting(layerObj *layer)
 {
   if (layer && (
-    (layer->connectiontype == MS_OGR) || (layer->connectiontype == MS_POSTGIS) || (layer->connectiontype == MS_ORACLESPATIAL) || ((layer->connectiontype == MS_PLUGIN) && (strstr(layer->plugin_library,"msplugin_oracle") != NULL))
+    (layer->connectiontype == MS_OGR) || (layer->connectiontype == MS_POSTGIS) || (layer->connectiontype == MS_ORACLESPATIAL) || ((layer->connectiontype == MS_PLUGIN) && (strstr(layer->plugin_library,"msplugin_oracle") != NULL)) || ((layer->connectiontype == MS_PLUGIN) && (strstr(layer->plugin_library,"msplugin_mssql2008") != NULL))
                )
      )
     return MS_TRUE;
@@ -2106,7 +2106,7 @@ msINLINELayerInfo;
 
 int msINLINELayerIsOpen(layerObj *layer)
 {
-  if (layer->currentfeature)
+  if (layer->layerinfo)
     return(MS_TRUE);
   else
     return(MS_FALSE);
@@ -2227,6 +2227,7 @@ int msINLINELayerNextShape(layerObj *layer, shapeObj *shape)
         shape->values = (char **)msSmallRealloc(shape->values, sizeof(char *)*(layer->numitems));
         for (i = shape->numvalues; i < layer->numitems; i++)
           shape->values[i] = msStrdup("");
+        shape->numvalues = layer->numitems;
       }
 
       break;

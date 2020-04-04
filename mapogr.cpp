@@ -76,7 +76,7 @@ typedef struct ms_ogr_file_info_t {
   char *pszRowId;
   int   bIsOKForSQLCompose;
   bool  bHasSpatialIndex; // used only for spatialite for now
-  char* pszTablePrefix; // prefix to qualify field names. used only for spatialite for now when a join is done for spatial filtering.
+  char* pszTablePrefix; // prefix to qualify field names. used only for spatialite & gpkg for now when a join is done for spatial filtering.
 
   int   bPaging;
 
@@ -1386,6 +1386,7 @@ msOGRFileOpen(layerObj *layer, const char *connection )
         if( have_gpkg_spatialite )
         {
             psInfo->pszMainTableName = msStrdup( OGR_L_GetName(hLayer) );
+            psInfo->pszTablePrefix = msStrdup( psInfo->pszMainTableName );
             psInfo->pszSpatialFilterTableName = msStrdup( OGR_L_GetName(hLayer) );
             psInfo->pszSpatialFilterGeometryColumn = msStrdup( OGR_L_GetGeometryColumn(hLayer) );
             psInfo->dialect = "GPKG";
@@ -1934,12 +1935,14 @@ char *msOGRGetToken(layerObj* layer, tokenListNodeObjPtr *node) {
             }
             else if (c == '.')
                 c = wild_one;
-
-            if (i == 0 && c == '^') {
+            else if (i == 0 && c == '^') {
                 i++;
                 continue;
             }
-                
+            else if( c == '$' && c_next == 0 ) {
+                break;
+            }
+
             re[j++] = c;
             i++;
                 
@@ -2472,7 +2475,7 @@ static int msOGRFileWhichShapes(layerObj *layer, rectObj rect, msOGRFileInfo *ps
 
         if ( !bOffsetAlreadyAdded && psInfo->bPaging && layer->startindex > 0 ) {
             char szOffset[50];
-            snprintf(szOffset, sizeof(szOffset), " OFFSET %d", layer->startindex);
+            snprintf(szOffset, sizeof(szOffset), " OFFSET %d", layer->startindex-1);
             select = msStringConcatenate(select, szOffset);
         }
 
@@ -3466,7 +3469,7 @@ static int  msOGRExtractTopSpatialFilter( msOGRFileInfo *info,
                                           pSpatialFilterNode);
   }
 
-  if( expr->m_nToken == MS_TOKEN_COMPARISON_INTERSECTS &&
+  if( (expr->m_nToken == MS_TOKEN_COMPARISON_INTERSECTS || expr->m_nToken == MS_TOKEN_COMPARISON_CONTAINS ) &&
       expr->m_aoChildren.size() == 2 &&
       expr->m_aoChildren[1]->m_nToken == MS_TOKEN_LITERAL_SHAPE )
   {
@@ -3643,6 +3646,8 @@ static std::string msOGRTranslatePartialInternal(layerObj* layer,
             {
                 if( i == 0 && expr->m_aoChildren[1]->m_osVal[i] == '^' )
                     continue;
+                if( i == nSize-1 && expr->m_aoChildren[1]->m_osVal[i] == '$' )
+                    break;
                 if( expr->m_aoChildren[1]->m_osVal[i] == '.' )
                 {
                     if( i+1<nSize &&
@@ -4421,9 +4426,9 @@ static int msOGRLayerInitItemInfo(layerObj *layer)
     }
     if(itemindexes[i] == -1) {
       msSetError(MS_OGRERR,
-                 "Invalid Field name: %s",
+                 "Invalid Field name: %s in layer `%s'",
                  "msOGRLayerInitItemInfo()",
-                 layer->items[i]);
+                 layer->items[i], layer->name ? layer->name : "(null)");
       return(MS_FAILURE);
     }
   }
@@ -5518,7 +5523,6 @@ void msOGRCleanup( void )
   ACQUIRE_OGR_LOCK;
   if( bOGRDriversRegistered == MS_TRUE ) {
     CPLPopErrorHandler();
-    OGRCleanupAll();
     bOGRDriversRegistered = MS_FALSE;
   }
   RELEASE_OGR_LOCK;

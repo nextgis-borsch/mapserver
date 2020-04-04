@@ -43,7 +43,7 @@
 static inline void IGUR_sizet(size_t ignored) { (void)ignored; }  /* Ignore GCC Unused Result */
 static inline void IGUR_voidp(void* ignored) { (void)ignored; }  /* Ignore GCC Unused Result */
 
-static char *olUrl = "http://www.mapserver.org/lib/OpenLayers-ms60.js";
+static char *olUrl = "//www.mapserver.org/lib/OpenLayers-ms60.js";
 static char *olTemplate = \
                           "<html>\n"
                           "<head>\n"
@@ -3671,7 +3671,9 @@ static char *processLine(mapservObj *mapserv, char *instr, FILE *stream, int mod
     strlcat(repstr, " ", sizeof(repstr));
   }
   msStringTrimBlanks(repstr);
-  outstr = msReplaceSubstring(outstr, "[layers]", repstr);
+  encodedstr = msEncodeHTMLEntities(repstr);
+  outstr = msReplaceSubstring(outstr, "[layers]", encodedstr);
+  free(encodedstr);
 
   encodedstr = msEncodeUrl(repstr);
   outstr = msReplaceSubstring(outstr, "[layers_esc]", encodedstr);

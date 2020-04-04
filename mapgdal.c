@@ -105,10 +105,6 @@ void msGDALCleanup( void )
     while( iRepeat-- )
       CPLPopErrorHandler();
 
-#if GDAL_RELEASE_DATE > 20021001
-    GDALDestroyDriverManager();
-#endif
-
     msReleaseLock( TLOCK_GDAL );
 
     bGDALInitialized = 0;
@@ -116,13 +112,13 @@ void msGDALCleanup( void )
 }
 
 /************************************************************************/
-/*                            CleanVSIDir()                             */
+/*                          msCleanVSIDir()                             */
 /*                                                                      */
 /*      For the temporary /vsimem/msout directory we need to be sure    */
 /*      things are clean before we start, and after we are done.        */
 /************************************************************************/
 
-void CleanVSIDir( const char *pszDir )
+void msCleanVSIDir( const char *pszDir )
 
 {
   char **papszFiles = CPLReadDir( pszDir );
@@ -133,7 +129,7 @@ void CleanVSIDir( const char *pszDir )
         || strcasecmp(papszFiles[i],"..") == 0 )
       continue;
 
-    VSIUnlink( papszFiles[i] );
+    VSIUnlink( CPLFormFilename(pszDir, papszFiles[i], NULL) );
   }
 
   CSLDestroy( papszFiles );
@@ -159,6 +155,7 @@ int msSaveImageGDAL( mapObj *map, imageObj *image, const char *filenameIn )
   int bUseXmp = MS_FALSE;
   const char   *filename = NULL;
   char         *filenameToFree = NULL;
+  const char   *gdal_driver_shortname = format->driver+5;
 
   msGDALInitialize();
   memset(&rb,0,sizeof(rasterBufferObj));
@@ -174,11 +171,11 @@ int msSaveImageGDAL( mapObj *map, imageObj *image, const char *filenameIn )
   /*      Identify the proposed output driver.                            */
   /* -------------------------------------------------------------------- */
   msAcquireLock( TLOCK_GDAL );
-  hOutputDriver = GDALGetDriverByName( format->driver+5 );
+  hOutputDriver = GDALGetDriverByName( gdal_driver_shortname );
   if( hOutputDriver == NULL ) {
     msReleaseLock( TLOCK_GDAL );
     msSetError( MS_MISCERR, "Failed to find %s driver.",
-                "msSaveImageGDAL()", format->driver+5 );
+                "msSaveImageGDAL()", gdal_driver_shortname );
     return MS_FAILURE;
   }
 
@@ -194,9 +191,13 @@ int msSaveImageGDAL( mapObj *map, imageObj *image, const char *filenameIn )
     if( pszExtension == NULL )
       pszExtension = "img.tmp";
 
-    if( bUseXmp == MS_FALSE && GDALGetMetadataItem( hOutputDriver, GDAL_DCAP_VIRTUALIO, NULL )
-        != NULL ) {
-      CleanVSIDir( "/vsimem/msout" );
+    if( bUseXmp == MS_FALSE &&
+        GDALGetMetadataItem( hOutputDriver, GDAL_DCAP_VIRTUALIO, NULL ) != NULL &&
+        /* We need special testing here for the netCDF driver, since recent */
+        /* GDAL versions advertize VirtualIO support, but this is only for the */
+        /* read-side of the driver, not the write-side. */
+        !EQUAL(gdal_driver_shortname, "netCDF") ) {
+      msCleanVSIDir( "/vsimem/msout" );
       filenameToFree = msTmpFile(map, NULL, "/vsimem/msout/", pszExtension );
     }
 
@@ -507,7 +508,7 @@ int msSaveImageGDAL( mapObj *map, imageObj *image, const char *filenameIn )
     VSIFCloseL( fp );
 
     VSIUnlink( filename );
-    CleanVSIDir( "/vsimem/msout" );
+    msCleanVSIDir( "/vsimem/msout" );
 
     msFree( filenameToFree );
   }

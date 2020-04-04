@@ -61,8 +61,8 @@ static inline void IGUR_sizet(size_t ignored) { (void)ignored; }  /* Ignore GCC 
 /*      on the map. Layer name and Named Layer's name parameter are     */
 /*      used to do the match.                                           */
 /************************************************************************/
-int msSLDApplySLDURL(mapObj *map, char *szURL, int iLayer,
-                     char *pszStyleLayerName,  char **ppszLayerNames)
+int msSLDApplySLDURL(mapObj *map, const char *szURL, int iLayer,
+                     const char *pszStyleLayerName,  char **ppszLayerNames)
 {
 #ifdef USE_OGR
 
@@ -81,7 +81,7 @@ int msSLDApplySLDURL(mapObj *map, char *szURL, int iLayer,
       pszSLDTmpFile = msTmpFile(map, NULL, NULL, "sld.xml" );
     }
     if (pszSLDTmpFile == NULL) {
-      msSetError(MS_WMSERR, "Could not determine temporary file %s. Please make sure that the temporary path is set. The temporary path can be defined for example by setting TMPPATH in the map file. Please check the MapServer documentation on temporary path settings.", "msSLDApplySLDURL()", pszSLDTmpFile);
+      msSetError(MS_WMSERR, "Could not determine temporary file %s. Please make sure that the temporary path is set. The temporary path can be defined for example by setting TEMPPATH in the map file. Please check the MapServer documentation on temporary path settings.", "msSLDApplySLDURL()", pszSLDTmpFile);
     } else {
       int nMaxRemoteSLDBytes;
       const char *pszMaxRemoteSLDBytes = msOWSLookupMetadata(&(map->web.metadata), "MO", "remote_sld_max_bytes");
@@ -108,13 +108,15 @@ int msSLDApplySLDURL(mapObj *map, char *szURL, int iLayer,
         }
       } else {
         unlink(pszSLDTmpFile);
-        msSetError(MS_WMSERR, "Could not open SLD %s and save it in a temporary file. Please make sure that the sld url is valid and that the temporary path is set. The temporary path can be defined for example by setting TMPPATH in the map file. Please check the MapServer documentation on temporary path settings.", "msSLDApplySLDURL", szURL);
+        msSetError(MS_WMSERR, "Could not open SLD %s and save it in a temporary file. Please make sure that the sld url is valid and that the temporary path is set. The temporary path can be defined for example by setting TEMPPATH in the map file. Please check the MapServer documentation on temporary path settings.", "msSLDApplySLDURL", szURL);
       }
       msFree(pszSLDTmpFile);
       if (pszSLDbuf)
         nStatus = msSLDApplySLD(map, pszSLDbuf, iLayer, pszStyleLayerName, ppszLayerNames);
     }
   }
+
+  msFree(pszSLDbuf);
 
   return nStatus;
 
@@ -143,7 +145,7 @@ int msSLDApplySLDURL(mapObj *map, char *szURL, int iLayer,
 /*      they have the same name, copy the classes asscoaited with       */
 /*      the SLD layers onto the map layers.                             */
 /************************************************************************/
-int msSLDApplySLD(mapObj *map, char *psSLDXML, int iLayer, char *pszStyleLayerName, char **ppszLayerNames)
+int msSLDApplySLD(mapObj *map, const char *psSLDXML, int iLayer, const char *pszStyleLayerName, char **ppszLayerNames)
 {
 #if defined(USE_WMS_SVR) || defined (USE_WFS_SVR) || defined (USE_WCS_SVR) || defined(USE_SOS_SVR)
 
@@ -486,7 +488,7 @@ sld_cleanup:
 /*      Returns an array of mapserver layers. The pnLayres if           */
 /*      provided will indicate the size of the returned array.          */
 /************************************************************************/
-layerObj  *msSLDParseSLD(mapObj *map, char *psSLDXML, int *pnLayers)
+layerObj  *msSLDParseSLD(mapObj *map, const char *psSLDXML, int *pnLayers)
 {
   CPLXMLNode *psRoot = NULL;
   CPLXMLNode *psSLD, *psNamedLayer, *psChild, *psName;
@@ -924,6 +926,7 @@ int msSLDParseNamedLayer(CPLXMLNode *psRoot, layerObj *psLayer)
         char* pszExpression = msSLDGetCommonExpressionFromFilter(psFilter,
                                                                     psLayer);
         if (pszExpression) {
+            msFreeExpression(&psLayer->filter);
             msInitExpression(&psLayer->filter);
             psLayer->filter.string = pszExpression;
             psLayer->filter.type = MS_EXPRESSION;

@@ -1,21 +1,6 @@
-################################################################################
-# Project:  NextGIS MapServer
-# Purpose:  CMake build scripts
-# Author:   Dmitry Baryshnikov, dmitry.baryshnikov@nexgis.com
-################################################################################
-# Copyright (C) 2017-2018, NextGIS <info@nextgis.com>
-#
-# Modified original MapServer script.
-################################################################################
-
-cmake_minimum_required(VERSION 2.8.12 FATAL_ERROR)
+cmake_minimum_required (VERSION 2.6)
 
 project (MapServer)
-
-# Some init settings
-set(CMAKE_COLOR_MAKEFILE ON)
-# Set path to additional CMake modules
-set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 
 if("${PROJECT_SOURCE_DIR}" STREQUAL "${PROJECT_BINARY_DIR}")
       message(FATAL_ERROR "In-source builds are not permitted. Make a separate folder for building:
@@ -31,9 +16,17 @@ include(CheckCSourceCompiles)
 
 
 set (MapServer_VERSION_MAJOR 7)
-set (MapServer_VERSION_MINOR 2)
-set (MapServer_VERSION_REVISION 1)
+set (MapServer_VERSION_MINOR 4)
+set (MapServer_VERSION_REVISION 4)
 set (MapServer_VERSION_SUFFIX "")
+
+# NextGIS ######################################################################
+# Add version.str for deb build
+set(VERSION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt)
+file(TIMESTAMP ${VERSION_FILE} VERSION_DATETIME "%Y-%m-%d %H:%M:%S" UTC)
+set(VERSION ${MapServer_VERSION_MAJOR}.${MapServer_VERSION_MINOR}.${MapServer_VERSION_REVISION})
+file(WRITE ${CMAKE_BINARY_DIR}/version.str "${VERSION}\n${VERSION_DATETIME}")
+################################################################################
 
 set(TARGET_VERSION_MAJOR ${MapServer_VERSION_MAJOR})
 set(TARGET_VERSION_MINOR ${MapServer_VERSION_MINOR})
@@ -48,6 +41,10 @@ endif(MapServer_IS_DEV_VERSION)
 MATH(EXPR MapServer_VERSION_NUM "${MapServer_VERSION_MAJOR}*10000+${MapServer_VERSION_MINOR}*100+${MapServer_VERSION_REVISION}")
 
 SET(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
+
+# Add custom function to check Python modules are installed
+include(FindPythonModule)
+
 if (APPLE)
   set(CMAKE_FIND_FRAMEWORK "LAST")
 endif (APPLE)
@@ -100,14 +97,13 @@ macro( report_dependency_error component dependency)
 endmacro()
 
 SET(CMAKE_REQUIRED_INCLUDES "math.h")
-if(NOT WIN32)
+if(NOT(WIN32))
 SET(CMAKE_REQUIRED_LIBRARIES "m")
-endif()
+endif(NOT(WIN32))
 
 check_function_exists("strrstr"          HAVE_STRRSTR)
 check_function_exists("strcasecmp"  HAVE_STRCASECMP)
 check_function_exists("strcasestr"  HAVE_STRCASESTR)
-check_function_exists("strdup"  HAVE_STRDUP)
 check_function_exists("strlcat"  HAVE_STRLCAT)
 check_function_exists("strlcpy"  HAVE_STRLCPY)
 check_function_exists("strlen"  HAVE_STRLEN)
@@ -158,6 +154,7 @@ option(WITH_THREAD_SAFETY "Choose if a thread-safe version of libmapserver shoul
 option(WITH_GIF "Enable GIF support (for PIXMAP loading)" ON)
 option(WITH_PYTHON "Enable Python mapscript support" OFF)
 option(WITH_PHP "Enable PHP mapscript support" OFF)
+option(WITH_PHPNG "Enable PHPNG (SWIG) mapscript support" OFF)
 option(WITH_PERL "Enable Perl mapscript support" OFF)
 option(WITH_RUBY "Enable Ruby mapscript support" OFF)
 option(WITH_JAVA "Enable Java mapscript support" OFF)
@@ -239,10 +236,10 @@ renderers/agg/src/clipper.cpp
 include_directories(renderers/agg/include)
 
 set(v8_SOURCES
-  mapscript/v8/v8_object_wrap.hpp
+  mapscript/v8/v8_object_wrap.hpp  
   mapscript/v8/point.cpp
   mapscript/v8/line.cpp
-  mapscript/v8/shape.cpp
+  mapscript/v8/shape.cpp  
   mapscript/v8/v8_mapscript.cpp
   mapv8.cpp
 )
@@ -261,7 +258,7 @@ else(WIN32)
   set(REGEX_SOURCES "")
 endif(WIN32)
 
-set(mapserver_SOURCES fontcache.c
+set(mapserver_SOURCES fontcache.c 
 cgiutil.c mapgeos.c maporaclespatial.c mapsearch.c mapwms.c classobject.c
 mapgml.c mapoutput.c mapwmslayer.c layerobject.c mapgraticule.c mapows.c
 mapservutil.c mapxbase.c maphash.c mapowscommon.c mapshape.c mapxml.c mapbits.c
@@ -326,7 +323,7 @@ if(BUILD_DYNAMIC)
   set_target_properties( mapserver  PROPERTIES
     VERSION ${MapServer_VERSION_STRING}
     SOVERSION 2
-)
+) 
 endif(BUILD_DYNAMIC)
 
 if(BUILD_STATIC)
@@ -334,7 +331,7 @@ if(BUILD_STATIC)
   set_target_properties( mapserver_static PROPERTIES
     VERSION ${MapServer_VERSION_STRING}
     SOVERSION 2
-  )
+  ) 
 endif(BUILD_STATIC)
 
 #SOVERSION is not necessarily the same as the
@@ -366,9 +363,9 @@ add_executable(shptreetst shptreetst.c)
 target_link_libraries(shptreetst ${MAPSERVER_LIBMAPSERVER})
 
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (CMAKE_BUILD_TYPE STREQUAL "Debug") 
   set(USE_EXTENDED_DEBUG 1)
-endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+endif (CMAKE_BUILD_TYPE STREQUAL "Debug") 
 
 find_package(PNG)
 if(PNG_FOUND)
@@ -810,7 +807,7 @@ if(WITH_XMLMAPFILE)
    if(NOT USE_LIBXML2)
     report_dependency_error(KML LIBXML2)
    endif(NOT USE_LIBXML2)
-
+  
   #check for xslt and exslt
   find_package(LibXslt)
   if(LIBXSLT_FOUND)
@@ -880,6 +877,11 @@ if(WITH_PHP)
    set(USE_PHP_MAPSCRIPT 1)
 endif(WITH_PHP)
 
+if(WITH_PHPNG)
+   add_subdirectory("mapscript/phpng")
+   set(USE_PHPNG_MAPSCRIPT 1)
+endif(WITH_PHPNG)
+
 if(WITH_APACHE_MODULE)
    add_subdirectory("apache")
    set(USE_APACHE_MODULE 1)
@@ -911,7 +913,10 @@ ms_link_libraries( ${CMAKE_DL_LIBS} m )
 endif(UNIX)
 
 if (WIN32)
-ms_link_libraries( ${MS_EXTERNAL_LIBS} ws2_32.lib)
+    ms_link_libraries( ${MS_EXTERNAL_LIBS} ws2_32.lib)
+    if (MSVC)
+        set_target_properties(mapserver PROPERTIES COMPILE_FLAGS "/wd4267 /wd4244 /wd4018")
+    endif(MSVC)
 endif (WIN32)
 
 configure_file (
@@ -998,6 +1003,7 @@ status_optional_feature("XML Mapfile support" "${USE_XMLMAPFILE}")
 message(STATUS " * Mapscripts")
 status_optional_feature("Python" "${USE_PYTHON_MAPSCRIPT}")
 status_optional_feature("PHP" "${USE_PHP_MAPSCRIPT}")
+status_optional_feature("PHPNG" "${USE_PHPNG_MAPSCRIPT}")
 status_optional_feature("PERL" "${USE_PERL_MAPSCRIPT}")
 status_optional_feature("RUBY" "${USE_RUBY_MAPSCRIPT}")
 status_optional_feature("JAVA" "${USE_JAVA_MAPSCRIPT}")
@@ -1052,9 +1058,7 @@ if(BUILD_DYNAMIC)
 
    # Export the package for use from the build-tree
    # (this registers the build-tree with a global CMake-registry)
-    if(REGISTER_PACKAGE)
-       export(PACKAGE mapserver)
-    endif()
+   export(PACKAGE mapserver)
 
    list(APPEND ALL_INCLUDE_DIRS ${INSTALL_INCLUDE_DIR})
    list(APPEND ALL_INCLUDE_DIRS ${INSTALL_INCLUDE_DIR}/mapserver)
