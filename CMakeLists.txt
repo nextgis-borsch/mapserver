@@ -20,6 +20,14 @@ set (MapServer_VERSION_MINOR 6)
 set (MapServer_VERSION_REVISION 2)
 set (MapServer_VERSION_SUFFIX "")
 
+# NextGIS ######################################################################
+# Add version.str for deb build
+set(VERSION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt)
+file(TIMESTAMP ${VERSION_FILE} VERSION_DATETIME "%Y-%m-%d %H:%M:%S" UTC)
+set(VERSION ${MapServer_VERSION_MAJOR}.${MapServer_VERSION_MINOR}.${MapServer_VERSION_REVISION})
+file(WRITE ${CMAKE_BINARY_DIR}/version.str "${VERSION}\n${VERSION_DATETIME}")
+################################################################################
+
 # Set C++ version
 # Make CMAKE_CXX_STANDARD available as cache option overridable by user
 set(CMAKE_CXX_STANDARD 11
