@@ -35,7 +35,7 @@
 #include "mapthread.h"
 #include "mapows.h"
 #include "mapwcs.h"
-
+#include "mapgdal.h"
 
 
 #if defined(USE_WCS_SVR)
@@ -728,6 +728,7 @@ msWCSDescribeCoverage_CoverageDescription11(
     double resy = cm.geotransform[5];
 
     msInitProjection( &proj );
+    msProjectionInheritContextFrom(&proj, &(layer->projection));
     if( msLoadProjectionString( &proj, cm.srs_urn ) == 0 ) {
       msAxisNormalizePoints( &proj, 1, &x0, &y0 );
       msAxisNormalizePoints( &proj, 1, &resx, &resy );
@@ -1187,8 +1188,7 @@ int  msWCSReturnCoverage11( wcsParamsObj *params, mapObj *map,
     if( pszExtension == NULL )
       pszExtension = "img.tmp";
 
-    if( GDALGetMetadataItem( hDriver, GDAL_DCAP_VIRTUALIO, NULL )
-        != NULL ) {
+    if( msGDALDriverSupportsVirtualIOOutput(hDriver) ) {
       base_dir = msTmpFile(map, map->mappath, "/vsimem/wcsout", NULL);
       if( fo_filename )
         filename = msStrdup(CPLFormFilename(base_dir,
